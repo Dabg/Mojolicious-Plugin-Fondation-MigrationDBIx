@@ -14,6 +14,8 @@ has usage       => sub ($self) {
     <<"USAGE";
 Usage: APPLICATION db COMMAND [OPTIONS]
 
+  myapp.pl db bootstrap-schema [--class ClassName] [--backend name] [--force]
+                                    Create a minimal DBIx::Class::Schema class
   myapp.pl db prepare [-y]          Copy DBIx migrations + fixtures from plugins
   myapp.pl db install               Run pending DBIx migrations
   myapp.pl db upgrade               Upgrade one version
@@ -32,6 +34,7 @@ sub run ($self, @args) {
         or die "MigrationDBIx not configured. Add Fondation::MigrationDBIx to your config.\n";
 
     for ($subcommand) {
+        /^bootstrap-schema$/ and return $self->_bootstrap_schema($app, $config, @args);
         /^install$/   and return $self->_install($app, $config, @args);
         /^upgrade$/   and return $self->_upgrade($app, $config, @args);
         /^downgrade$/ and return $self->_downgrade($app, $config, @args);
@@ -66,6 +69,138 @@ sub _build_dh ($self, $app, $config) {
         sql_translator_args => { add_drop_table => 0 },
         ignore_ddl          => 1,
     );
+}
+
+# ---------------------------------------------------------------------------
+# db bootstrap-schema — create a minimal DBIx::Class::Schema class file
+# ---------------------------------------------------------------------------
+
+sub _bootstrap_schema ($self, $app, $config, @args) {
+    my $class_name;
+    my $backend_name;
+    my $force;
+
+    # Parse options
+    for (my $i = 0; $i < @args; $i++) {
+        if ($args[$i] eq '--class' && defined $args[$i + 1]) {
+            $class_name = $args[$i + 1];
+            $i++;
+        }
+        elsif ($args[$i] eq '--backend' && defined $args[$i + 1]) {
+            $backend_name = $args[$i + 1];
+            $i++;
+        }
+        elsif ($args[$i] eq '--force') {
+            $force = 1;
+        }
+    }
+
+    # Resolve backend name
+    unless ($backend_name) {
+        my $c = $app->build_controller;
+        if ($c->has_helper('default_backend_name')) {
+            $backend_name = $c->default_backend_name($config->{backend});
+        }
+        elsif ($config->{backend}) {
+            $backend_name = $config->{backend};
+        }
+    }
+
+    unless ($backend_name) {
+        die "No backend specified. Use --backend <name> or configure one.\n";
+    }
+
+    # Check if DBIx::Async is loaded and schema_class already configured
+    my $c = $app->build_controller;
+    if ($c->has_helper('backend_config')) {
+        my $bdef = eval { $c->backend_config($backend_name) };
+        if ($bdef && $bdef->{schema_class}) {
+            if ($class_name && $class_name ne $bdef->{schema_class}) {
+                say "Note: backend '$backend_name' already has schema_class '"
+                    . "$bdef->{schema_class}'. Generating '$class_name' anyway.";
+            }
+            # Use existing schema_class if no --class given
+            $class_name //= $bdef->{schema_class};
+        }
+    }
+
+    # Derive class name from moniker if not specified
+    unless ($class_name) {
+        my $moniker = $app->moniker // 'MyApp';
+        $class_name = ucfirst($moniker) . '::Schema';
+    }
+
+    # Determine file path under lib/
+    (my $class_path = "$class_name.pm") =~ s{::}{/}g;
+    my $file = $app->home->child('lib', $class_path);
+
+    # Check for existing file
+    if (-f $file && !$force) {
+        die "Schema file already exists: $file\n"
+            . "Use --force to overwrite.\n";
+    }
+
+    # Create parent directories
+    $file->dirname->make_path;
+
+    # Write the minimal schema class
+    my $content = <<"SCHEMA";
+package $class_name;
+
+use base 'DBIx::Class::Schema';
+
+# Increment this version when you change the schema.
+# Run 'db prepare' after altering tables, then 'db upgrade' to apply.
+our \$VERSION = '1';
+
+# Auto-discovers Result classes under ${class_name}::Result::*
+# Local classes take priority over plugin Result classes registered
+# by the DBIx action (load_namespaces runs during connect(), after
+# the action has registered plugin sources).
+__PACKAGE__->load_namespaces;
+
+1;
+SCHEMA
+
+    $file->spurt($content);
+
+    say "Created $file";
+    say "";
+
+    # Show configuration instructions if schema_class is not yet configured
+    if ($c->has_helper('backend_config')) {
+        my $bdef = eval { $c->backend_config($backend_name) };
+        if (!$bdef) {
+            say "Backend '$backend_name' not found in DBIx::Async config.";
+            say "Make sure Fondation::Model::DBIx::Async is configured with a";
+            say "backend named '$backend_name'.";
+            say "";
+            say "  'Fondation::Model::DBIx::Async' => {";
+            say "      backends => {";
+            say "          $backend_name => {";
+            say "              dsn          => 'dbi:SQLite:dbname=data/app.db',";
+            say "              schema_class => '$class_name',";
+            say "          },";
+            say "      },";
+            say "  },";
+        }
+        elsif (!$bdef->{schema_class}) {
+            say "Add this to your backend '$backend_name' config in myapp.conf:";
+            say "";
+            say "  schema_class => '$class_name',   # ← add this line";
+            say "";
+            say "Then run: myapp.pl db prepare";
+        }
+        else {
+            say "Schema class '$class_name' is ready.";
+            say "Run: myapp.pl db prepare";
+        }
+    }
+    else {
+        say "Add 'schema_class => '$class_name'' to your backend";
+        say "'$backend_name' in Fondation::Model::DBIx::Async config.";
+        say "Then run: myapp.pl db prepare";
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -341,7 +476,8 @@ sub _build_native_schema ($self, $app, $config) {
         or die "No schema_class configured for backend '$backend_name'\n";
 
     eval "require $schema_class; 1"
-        or die "Cannot load schema class $schema_class: $@\n";
+        or die "Cannot load schema class $schema_class: $@\n"
+            . "Run 'db bootstrap-schema' to create the file.\n";
 
     # Ensure parent directory exists for file-based DSNs (SQLite)
     if ($bdef->{dsn} =~ /^dbi:SQLite:(?:dbname=)?(.+)$/i) {
@@ -389,6 +525,7 @@ Mojolicious::Plugin::Fondation::MigrationDBIx::Command::db - Database migration 
 
 =head1 SYNOPSIS
 
+  $ myapp.pl db bootstrap-schema
   $ myapp.pl db prepare
   $ myapp.pl db install
   $ myapp.pl db status
@@ -402,5 +539,57 @@ for DBIx::Class backends managed by L<Fondation::Model::DBIx::Async>.
 Migrations use L<DBIx::Class::DeploymentHandler> directly with C<ignore_ddl = 1>.
 Upgrade and downgrade SQL are generated on-the-fly from C<_source/> YAML files —
 no C<db dump> step is needed.
+
+=head1 COMMANDS
+
+=head2 db bootstrap-schema [--class ClassName] [--backend name] [--force]
+
+Creates a minimal L<DBIx::Class::Schema> class file under C<lib/>. Use this
+when you have DBIx backends configured but no C<schema_class> yet, or when
+C<schema_class> is configured but the file does not exist. After creating
+the file, add C<schema_class> to your backend config (if not already set)
+and run C<db prepare> to generate migration files.
+
+The generated class uses C<load_namespaces> to auto-discover any C<Result>
+classes under the application's C<Schema::Result::*> namespace. Result
+classes from Fondation plugins are registered separately by the C<DBIx>
+action before workers fork — both mechanisms coexist transparently.
+
+If C<schema_class> is already configured in your backend, C<bootstrap-schema>
+uses that class name automatically (no C<--class> needed).
+
+=head3 Options
+
+=over
+
+=item C<--class ClassName>
+
+Full class name for the schema. Defaults to C<< <Moniker>::Schema >>
+(e.g. C<MyApp::Schema> when the application moniker is C<my_app>), or to
+the already-configured C<schema_class> if the backend defines one.
+
+=item C<--backend name>
+
+Backend name to reference in the post-creation instructions. When omitted,
+resolves via C<default_backend_name> (same cascade as other C<db> commands:
+explicit C<Fondation::MigrationDBIx> C<backend> config → DBIx::Async
+C<default_backend> → first backend).
+
+=item C<--force>
+
+Overwrite the schema file if it already exists.
+
+=back
+
+=head3 Local vs plugin Result priority
+
+When both the application and a plugin define a C<Schema::Result::*> class
+for the same table, the application's class wins: C<load_namespaces> runs
+during C<connect()>, I<after> the C<DBIx> action has registered plugin sources.
+The later registration overwrites the earlier one.
+
+This means you can extend or replace a plugin's Result class by defining
+your own under C<< $AppSchema::Result::* >> with the same
+C<< __PACKAGE__->table(...) >>.
 
 =cut

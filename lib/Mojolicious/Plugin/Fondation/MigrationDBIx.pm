@@ -67,12 +67,13 @@ management for DBIx::Class backends
   }
 
   # Commands
-  $ myapp.pl db prepare              # Generate SQL + copy fixtures from plugins
-  $ myapp.pl db install              # Run pending migrations
-  $ myapp.pl db upgrade              # Upgrade one version
-  $ myapp.pl db downgrade            # Downgrade one version
-  $ myapp.pl db status               # Show current migration version
-  $ myapp.pl db populate [--set 1]   # Load fixture data
+  $ myapp.pl db bootstrap-schema      # Create a minimal Schema class
+  $ myapp.pl db prepare               # Generate SQL + copy fixtures from plugins
+  $ myapp.pl db install               # Run pending migrations
+  $ myapp.pl db upgrade               # Upgrade one version
+  $ myapp.pl db downgrade             # Downgrade one version
+  $ myapp.pl db status                # Show current migration version
+  $ myapp.pl db populate [--set 1]    # Load fixture data
 
 =head1 DESCRIPTION
 
@@ -84,9 +85,10 @@ L<Fondation::Model::DBIx::Async>.
 
 The typical workflow:
 
-  myapp.pl db prepare    # Step 1: generate SQL from schema classes
-  myapp.pl db install    # Step 2: apply migrations to the database
-  myapp.pl db populate   # Step 3: load initial data
+  myapp.pl db bootstrap-schema  # Step 0 (optional): create Schema class if none
+  myapp.pl db prepare           # Step 1: generate SQL from schema classes
+  myapp.pl db install           # Step 2: apply migrations to the database
+  myapp.pl db populate          # Step 3: load initial data
 
 For incremental changes, edit your schema, re-run C<db prepare>, then
 C<db upgrade> / C<db downgrade>.
@@ -156,6 +158,24 @@ Custom path for migration files. Defaults to C<E<lt>app homeE<gt>/share/migratio
 =head1 COMMANDS
 
 All commands are invoked as C<myapp.pl db COMMAND [OPTIONS]>.
+
+=head2 db bootstrap-schema [--class ClassName] [--backend name] [--force]
+
+Creates a minimal L<DBIx::Class::Schema> class file under C<lib/>. Use this
+when you have DBIx backends configured but no C<schema_class> yet. After
+creating the file, add C<schema_class> to your backend config and run
+C<db prepare> to generate migration files.
+
+The generated class uses C<load_namespaces> to auto-discover any C<Result>
+classes under the application's C<Schema::Result::*> namespace. Result
+classes from Fondation plugins are registered separately by the C<DBIx>
+action before workers fork — both mechanisms coexist transparently.
+
+When both the application and a plugin define a C<Result> class for the
+same table, the application's class wins: C<load_namespaces> runs during
+C<connect()>, I<after> the C<DBIx> action has registered plugin sources.
+This lets you extend or replace a plugin's Result class by defining your
+own with the same C<< __PACKAGE__->table(...) >>.
 
 =head2 db prepare [-y]
 
