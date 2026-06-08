@@ -737,4 +737,18 @@ This means you can extend or replace a plugin's Result class by defining
 your own under C<< $AppSchema::Result::* >> with the same
 C<< __PACKAGE__->table(...) >>.
 
+=head2 db prepare [-y] [-a]
+
+Generates SQL migration files from the schema classes and copies fixture
+directories from all loaded plugins. Use C<-y> to skip the overwrite prompt.
+
+Before generating, compares the live schema signature against the
+C<.schema-sig.json> file saved after the last prepare. If the schema has
+drifted — for example because a plugin Result class changed after a
+C<cpanm> upgrade — the changed sources are reported and the command exits.
+
+Use C<-a> to auto-bump the schema C<$VERSION> and generate the migration.
+The version is incremented in the class file and in memory; previous
+migration versions are preserved.
+
 =cut

@@ -86,6 +86,26 @@ management for DBIx::Class backends
 
 0.01
 
+# HELPERS
+
+## schema\_drift
+
+    my $drift = $c->schema_drift;
+
+Returns a hashref describing schema changes since the last `db prepare`:
+
+    { has_drift => 1, version => '2', changes => { users => { added => ['phone'] } } }
+
+or `{ has_drift =` 0 }> if nothing changed. Reads the `.schema-sig.json`
+file saved by `db prepare` and compares against the live schema signature
+from ["schema\_sig" in Fondation::Model::DBIx::Async](https://metacpan.org/pod/Fondation%3A%3AModel%3A%3ADBIx%3A%3AAsync#schema_sig).
+
+Used automatically at application startup via `fondation_finalyze`:
+if a plugin Result class has changed (e.g. after a `cpanm` upgrade),
+a warning is logged suggesting `db prepare -a && db upgrade`.
+The application continues running — the schema is not broken, just
+out of sync with the migration files.
+
 # CONFIGURATION
 
     'Fondation::MigrationDBIx' => {

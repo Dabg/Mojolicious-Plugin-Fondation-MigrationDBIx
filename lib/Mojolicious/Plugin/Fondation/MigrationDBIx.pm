@@ -310,6 +310,26 @@ directory. The directory structure is:
           └── my_table/
               └── 1.fix      # fixture data
 
+=head1 HELPERS
+
+=head2 schema_drift
+
+  my $drift = $c->schema_drift;
+
+Returns a hashref describing schema changes since the last C<db prepare>:
+
+  { has_drift => 1, version => '2', changes => { users => { added => ['phone'] } } }
+
+or C<{ has_drift => 0 }> if nothing changed. Reads the C<.schema-sig.json>
+file saved by C<db prepare> and compares against the live schema signature
+from L<Fondation::Model::DBIx::Async/schema_sig>.
+
+Used automatically at application startup via C<fondation_finalyze>:
+if a plugin Result class has changed (e.g. after a C<cpanm> upgrade),
+a warning is logged suggesting C<db prepare -a && db upgrade>.
+The application continues running — the schema is not broken, just
+out of sync with the migration files.
+
 =head1 CONFIGURATION
 
   'Fondation::MigrationDBIx' => {
