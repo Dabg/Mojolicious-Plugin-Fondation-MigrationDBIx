@@ -23,12 +23,13 @@ version 0.01
     }
 
     # Commands
-    $ myapp.pl db prepare              # Generate SQL + copy fixtures from plugins
-    $ myapp.pl db install              # Run pending migrations
-    $ myapp.pl db upgrade              # Upgrade one version
-    $ myapp.pl db downgrade            # Downgrade one version
-    $ myapp.pl db status               # Show current migration version
-    $ myapp.pl db populate [--set 1]   # Load fixture data
+    $ myapp.pl db bootstrap-schema      # Create a minimal Schema class
+    $ myapp.pl db prepare               # Generate SQL + copy fixtures from plugins
+    $ myapp.pl db install               # Run pending migrations
+    $ myapp.pl db upgrade               # Upgrade one version
+    $ myapp.pl db downgrade             # Downgrade one version
+    $ myapp.pl db status                # Show current migration version
+    $ myapp.pl db populate [--set 1]    # Load fixture data
 
 # DESCRIPTION
 
@@ -40,9 +41,10 @@ managing database migrations and fixtures for DBIx::Class backends managed by
 
 The typical workflow:
 
-    myapp.pl db prepare    # Step 1: generate SQL from schema classes
-    myapp.pl db install    # Step 2: apply migrations to the database
-    myapp.pl db populate   # Step 3: load initial data
+    myapp.pl db bootstrap-schema  # Step 0 (optional): create Schema class if none
+    myapp.pl db prepare           # Step 1: generate SQL from schema classes
+    myapp.pl db install           # Step 2: apply migrations to the database
+    myapp.pl db populate          # Step 3: load initial data
 
 For incremental changes, edit your schema, re-run `db prepare`, then
 `db upgrade` / `db downgrade`.
@@ -103,6 +105,24 @@ Custom path for migration files. Defaults to `<app home>/share/migrations`.
 # COMMANDS
 
 All commands are invoked as `myapp.pl db COMMAND [OPTIONS]`.
+
+## db bootstrap-schema \[--class ClassName\] \[--backend name\] \[--force\]
+
+Creates a minimal [DBIx::Class::Schema](https://metacpan.org/pod/DBIx%3A%3AClass%3A%3ASchema) class file under `lib/`. Use this
+when you have DBIx backends configured but no `schema_class` yet. After
+creating the file, add `schema_class` to your backend config and run
+`db prepare` to generate migration files.
+
+The generated class uses `load_namespaces` to auto-discover any `Result`
+classes under the application's `Schema::Result::*` namespace. Result
+classes from Fondation plugins are registered separately by the `DBIx`
+action before workers fork — both mechanisms coexist transparently.
+
+When both the application and a plugin define a `Result` class for the
+same table, the application's class wins: `load_namespaces` runs during
+`connect()`, _after_ the `DBIx` action has registered plugin sources.
+This lets you extend or replace a plugin's Result class by defining your
+own with the same `__PACKAGE__->table(...)`.
 
 ## db prepare \[-y\]
 
