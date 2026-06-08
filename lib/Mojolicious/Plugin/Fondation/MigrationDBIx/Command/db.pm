@@ -16,7 +16,8 @@ Usage: APPLICATION db COMMAND [OPTIONS]
 
   myapp.pl db bootstrap-schema [--class ClassName] [--backend name] [--force]
                                     Create a minimal DBIx::Class::Schema class
-  myapp.pl db prepare [-y]          Copy DBIx migrations + fixtures from plugins
+  myapp.pl db prepare [-y] [-a]     Generate SQL migrations + copy fixtures
+                                    -a  Auto-bump schema version on drift
   myapp.pl db install               Run pending DBIx migrations
   myapp.pl db upgrade               Upgrade one version
   myapp.pl db downgrade             Downgrade one version
@@ -208,10 +209,55 @@ SCHEMA
 # ---------------------------------------------------------------------------
 
 sub _prepare ($self, $app, $config, @args) {
-    my $yes = grep { $_ eq '-y' } @args;
+    my $yes       = grep { $_ eq '-y' } @args;
+    my $auto_bump = grep { $_ eq '-a' } @args;
 
     my $mig_dir = path($config->{migrations_dir});
     my $fix_dir = $app->home->child('share', 'fixtures');
+
+    # Detect schema drift (changes since last prepare)
+    my $c     = $app->build_controller;
+    my $drift = $c->has_helper('schema_drift')
+        ? eval { $c->schema_drift } : undef;
+
+    if ($drift && $drift->{has_drift} && !$auto_bump) {
+        say "\nSchema version $drift->{version} has drifted since last prepare:";
+        for my $name (sort keys %{$drift->{changes}}) {
+            my $ch = $drift->{changes}{$name};
+            if ($ch eq 'new') {
+                say "  + $name (new table)";
+            }
+            elsif ($ch eq 'removed') {
+                say "  - $name (removed)";
+            }
+            else {
+                my @details;
+                push @details, "+" . join(',+', @{$ch->{added}})
+                    if @{$ch->{added}};
+                push @details, "-" . join(',-', @{$ch->{removed}})
+                    if @{$ch->{removed}};
+                for my $col (sort keys %{$ch->{modified}}) {
+                    my $mod = $ch->{modified}{$col};
+                    my @attrs = sort keys %$mod;
+                    push @details, "~$col(" . join(',', @attrs) . ")";
+                }
+                if ($ch->{primary_keys}) {
+                    push @details, "~PK";
+                }
+                say "  ~ $name ("
+                    . join('; ', @details) . ")" if @details;
+            }
+        }
+        say "\nRun 'db prepare -a' to auto-bump the version and generate the";
+        say "migration, or bump \$VERSION in your schema class manually.";
+        return;
+    }
+
+    # Auto-bump schema version if requested
+    if ($auto_bump && $drift && $drift->{has_drift}) {
+        say "Schema drifted — auto-bumping version...";
+        $self->_bump_schema_version($app, $config);
+    }
 
     # Check if target directories already have content
     my @existing;
@@ -238,12 +284,18 @@ sub _prepare ($self, $app, $config, @args) {
     # Generate SQL from schema classes via DeploymentHandler
     my $dh = $self->_build_dh($app, $config);
     if ($dh) {
-        # Remove existing generated dirs so DeploymentHandler regenerates cleanly
-        $mig_dir->child('_source')->remove_tree if $force && -d $mig_dir->child('_source');
-        $mig_dir->child('SQLite')->remove_tree  if $force && -d $mig_dir->child('SQLite');
+        # Remove existing generated dirs so DeploymentHandler regenerates cleanly —
+        # skip this when auto-bumping (we're adding a version, not rebuilding)
+        unless ($auto_bump) {
+            $mig_dir->child('_source')->remove_tree if $force && -d $mig_dir->child('_source');
+            $mig_dir->child('SQLite')->remove_tree  if $force && -d $mig_dir->child('SQLite');
+        }
 
         $dh->prepare_install;
         say "Done.";
+
+        # Save schema signature for future drift detection
+        $self->_save_sig($app, $config, $dh);
     }
 
     # Copy fixture tree from all plugins
@@ -354,9 +406,27 @@ sub _downgrade ($self, $app, $config, @args) {
         ? $dh->database_version : 0;
     die "No version installed. Nothing to downgrade.\n" unless $db_v;
 
-    say "Downgrading from version $db_v to " . ($db_v - 1) . "...";
+    my $target_v = $db_v - 1;
+
+    # Temporarily set the schema $VERSION one lower so DeploymentHandler
+    # sees schema_version < database_version and triggers the downgrade.
+    my $c = $app->build_controller;
+    my $schema_class = $c->has_helper('schema_class')
+        ? $c->schema_class : undef;
+    if ($schema_class) {
+        no strict 'refs';
+        ${"${schema_class}::VERSION"} = $target_v;
+    }
+
+    say "Downgrading from version $db_v to $target_v...";
     $dh->downgrade;
     say "Done. Active version: " . $dh->database_version;
+
+    # Restore the original version
+    if ($schema_class) {
+        no strict 'refs';
+        ${"${schema_class}::VERSION"} = $db_v;
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -509,6 +579,81 @@ sub _dir_has_content ($self, $dir) {
 sub _file_count ($self, $dir) {
     return 0 unless -d $dir;
     return scalar grep { -f $_ } @{ $dir->list_tree({ hidden => 1 }) // [] };
+}
+
+# ---------------------------------------------------------------------------
+# Save schema signature for future drift detection
+# ---------------------------------------------------------------------------
+
+sub _save_sig ($self, $app, $config, $dh) {
+    my $c = $app->build_controller;
+    my $live_sig = $c->schema_sig($dh->schema);
+
+    my $version = $dh->schema_version
+        or die "Cannot determine schema version after prepare\n";
+
+    my $sig = {
+        version => $version,
+        sources => $live_sig,
+    };
+
+    my $sig_file = $config->{sig_file}
+        or return;
+
+    path($sig_file)->dirname->make_path;
+    path($sig_file)->spew(encode_json($sig));
+}
+
+# ---------------------------------------------------------------------------
+# Auto-bump the schema version in the class file
+# ---------------------------------------------------------------------------
+
+sub _bump_schema_version ($self, $app, $config) {
+    my $c = $app->build_controller;
+
+    my $schema_class;
+    if ($c->has_helper('schema_class')) {
+        $schema_class = $c->schema_class;
+    }
+
+    unless ($schema_class) {
+        say "Cannot auto-bump: no schema_class configured.";
+        return;
+    }
+
+    (my $class_path = "$schema_class.pm") =~ s{::}{/}g;
+    my $file = $app->home->child('lib', $class_path);
+
+    unless (-f $file) {
+        say "Cannot auto-bump: schema file not found ($file).";
+        return;
+    }
+
+    my $content = $file->slurp;
+    unless ($content =~ /^our\s+\$VERSION\s*=\s*['"]?(\d+)['"]?\s*;/m) {
+        say "Cannot auto-bump: no \$VERSION found in $schema_class.";
+        return;
+    }
+
+    my $old_version = $1;
+    my $new_version = $old_version + 1;
+
+    $content =~ s/^(our\s+\$VERSION\s*=\s*['"]?)$old_version(['"]?\s*;)/${1}${new_version}${2}/m
+        or do {
+            say "Cannot auto-bump: failed to replace \$VERSION.";
+            return;
+        };
+
+    $file->spurt($content);
+    say "Bumped \$VERSION from $old_version to $new_version in $file";
+
+    # Update the in-memory $VERSION so the next _build_dh sees it.
+    # Direct assignment avoids reloading the class (which would lose
+    # all register_source calls from Action::DBIx).
+    {
+        no strict 'refs';
+        ${"${schema_class}::VERSION"} = $new_version;
+    }
 }
 
 1;

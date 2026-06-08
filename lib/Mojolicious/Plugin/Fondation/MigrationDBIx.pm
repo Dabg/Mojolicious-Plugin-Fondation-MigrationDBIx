@@ -4,6 +4,9 @@ package Mojolicious::Plugin::Fondation::MigrationDBIx;
 
 use Mojo::Base 'Mojolicious::Plugin', -signatures;
 
+use Mojo::File 'path';
+use JSON::MaybeXS;
+
 our $VERSION = '0.01';
 
 sub fondation_meta {
@@ -22,15 +25,183 @@ sub register ($self, $app, $config) {
     my $migrations_dir = $config->{migrations_dir}
         // $app->home->child('share', 'migrations')->to_string;
 
+    my $sig_file = path($migrations_dir)->child('.schema-sig.json')->to_string;
+
     $app->defaults('migration_dbix.config' => {
         backend        => $backend_name,
         migrations_dir => $migrations_dir,
+        sig_file       => $sig_file,
     });
 
     push @{$app->commands->namespaces},
         'Mojolicious::Plugin::Fondation::MigrationDBIx::Command';
 
+    # Helper: schema_drift() — detect schema changes since last prepare
+    $app->helper(schema_drift => sub ($c) {
+        my $cfg = $app->defaults->{'migration_dbix.config'};
+
+        # Build a native schema (no async workers) for inspection
+        require Mojolicious::Plugin::Fondation::MigrationDBIx::Command::db;
+        my $native = Mojolicious::Plugin::Fondation::MigrationDBIx::Command::db
+            ->_build_native_schema($app, $cfg);
+        return unless $native;
+
+        my $live_sig = $c->schema_sig($native);
+        my $stored   = $self->_load_sig($cfg->{sig_file});
+
+        # Disconnect the native schema — we only needed it for inspection
+        $native->storage->disconnect if $native->storage;
+
+        return { has_drift => 0, version => $stored->{version} // '?' }
+            unless $stored;
+
+        my $changes = $self->_sig_diff($stored->{sources}, $live_sig);
+
+        return {
+            has_drift => !!(%$changes),
+            version   => $stored->{version} // '?',
+            changes   => $changes,
+        };
+    });
+
     return $self;
+}
+
+sub fondation_finalyze ($self, $app, $long_name) {
+    return 1 unless $app->has_helper('schema_drift');
+
+    my $c = $app->build_controller;
+    my $drift = eval { $c->schema_drift };
+    return 1 unless $drift && $drift->{has_drift};
+
+    my @changed = sort keys %{$drift->{changes}};
+    $app->log->warn(sprintf(
+        '[Fondation::MigrationDBIx] Schema drifted in sources: %s',
+        join(', ', @changed)));
+    $app->log->warn(sprintf(
+        '[Fondation::MigrationDBIx] Version %s. Run: db prepare -a && db upgrade',
+        $drift->{version}));
+    return 1;
+}
+
+# Load the stored schema signature from disk
+sub _load_sig ($self, $sig_file) {
+    return undef unless -f $sig_file;
+    my $data = eval { path($sig_file)->slurp };
+    return undef unless $data;
+    my $sig = eval { decode_json($data) };
+    return undef unless $sig && $sig->{sources};
+    return $sig;
+}
+
+# Compare two schema signatures and return changed sources
+sub _sig_diff ($self, $stored_sources, $live_sources) {
+    my $changes = {};
+
+    # Sources in live but not stored → new tables
+    for my $name (keys %$live_sources) {
+        unless (exists $stored_sources->{$name}) {
+            $changes->{$name} = 'new';
+        }
+    }
+
+    # Sources in stored but not live → removed tables
+    for my $name (keys %$stored_sources) {
+        unless (exists $live_sources->{$name}) {
+            $changes->{$name} = 'removed';
+        }
+    }
+
+    # Sources in both → check column-level changes
+    for my $name (keys %$live_sources) {
+        next if $changes->{$name};
+        next unless $stored_sources->{$name};
+        my $diff = $self->_sig_diff_source(
+            $stored_sources->{$name}, $live_sources->{$name});
+        $changes->{$name} = $diff if $diff && _source_diff_has_changes($diff);
+    }
+
+    return $changes;
+}
+
+# Compare a single source between stored and live
+sub _sig_diff_source ($self, $stored, $live) {
+    my $diff = { added => [], removed => [], modified => {} };
+
+    my %stored_cols = map { $_->{name} => $_ } @{$stored->{columns}};
+    my %live_cols   = map { $_->{name} => $_ } @{$live->{columns}};
+
+    # Added columns
+    for my $name (sort keys %live_cols) {
+        push @{$diff->{added}}, $name unless exists $stored_cols{$name};
+    }
+
+    # Removed columns
+    for my $name (sort keys %stored_cols) {
+        push @{$diff->{removed}}, $name unless exists $live_cols{$name};
+    }
+
+    # Modified columns
+    for my $name (sort keys %live_cols) {
+        next unless exists $stored_cols{$name};
+        my $s = $stored_cols{$name};
+        my $l = $live_cols{$name};
+        my %mod;
+        for my $attr (qw(data_type is_nullable is_auto_increment
+            default_value size is_foreign_key))
+        {
+            my $sv = $s->{$attr};
+            my $lv = $l->{$attr};
+            next if !defined($sv) && !defined($lv);
+            next if  defined($sv) &&  defined($lv) && _eq_deep($sv, $lv);
+            $mod{$attr} = [$sv, $lv];
+        }
+        $diff->{modified}{$name} = \%mod if %mod;
+    }
+
+    # PK changes
+    my %stored_pk = map { $_ => 1 } @{$stored->{primary_keys}};
+    my %live_pk   = map { $_ => 1 } @{$live->{primary_keys}};
+    if (join(',', sort keys %stored_pk) ne join(',', sort keys %live_pk)) {
+        $diff->{primary_keys} = [
+            [sort keys %stored_pk],
+            [sort keys %live_pk],
+        ];
+    }
+
+    return $diff;
+}
+
+# Deep equality for nested structures (arrays, hashes, scalars)
+sub _eq_deep {
+    my ($a, $b) = @_;
+    return 0 if ref $a ne ref $b;
+    return $a eq $b if !ref $a;
+    if (ref $a eq 'ARRAY') {
+        return 0 if @$a != @$b;
+        for my $i (0 .. $#$a) {
+            return 0 unless _eq_deep($a->[$i], $b->[$i]);
+        }
+        return 1;
+    }
+    if (ref $a eq 'HASH') {
+        return 0 if keys %$a != keys %$b;
+        for my $k (keys %$a) {
+            return 0 unless exists $b->{$k} && _eq_deep($a->{$k}, $b->{$k});
+        }
+        return 1;
+    }
+    return 0;
+}
+
+# Check if a source diff has any actual changes
+sub _source_diff_has_changes {
+    my ($diff) = @_;
+    return 1 if @{$diff->{added}};
+    return 1 if @{$diff->{removed}};
+    return 1 if %{$diff->{modified}};
+    return 1 if $diff->{primary_keys};
+    return 0;
 }
 
 1;
