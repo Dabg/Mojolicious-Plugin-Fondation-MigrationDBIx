@@ -13,7 +13,7 @@ version 0.01
         'Fondation' => {
             dependencies => [
                 { 'Fondation::Model::DBIx::Async' => {
-                    backends => { main => { ... } },
+                    backends => [ main => { ... } ],
                 }},
                 { 'Fondation::MigrationDBIx' => {
                     backend => 'main',    # optional — uses DBIx::Async default

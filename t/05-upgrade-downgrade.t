@@ -25,13 +25,13 @@ sub build_app {
     $app->plugin('Fondation' => {
         dependencies => [
             { 'Fondation::Model::DBIx::Async' => {
-                backends => {
+                backends => [
                     test => {
                         dsn          => "dbi:SQLite:dbname=$dbfile",
                         schema_class => 'TestSchema',
                         workers      => 1,
                     },
-                },
+                ],
                 models => {
                     foo => { source => 'foos', backend => 'test' },
                 },

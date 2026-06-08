@@ -41,7 +41,7 @@ sub build_app {
     $app->plugin('Fondation' => {
         dependencies => [
             { 'Fondation::Model::DBIx::Async' => {
-                backends => { main => $backend_cfg },
+                backends => [ main => $backend_cfg ],
             }},
             { 'Fondation::MigrationDBIx' => {} },
         ],
@@ -162,7 +162,7 @@ sub build_app {
 
     $app->plugin('Fondation' => {
         dependencies => [
-            { 'Fondation::Model::DBIx::Async' => { backends => {} } },
+            { 'Fondation::Model::DBIx::Async' => { backends => [] } },
             { 'Fondation::MigrationDBIx' => {} },
         ],
     });

@@ -177,12 +177,12 @@ SCHEMA
             say "backend named '$backend_name'.";
             say "";
             say "  'Fondation::Model::DBIx::Async' => {";
-            say "      backends => {";
+            say "      backends => [";
             say "          $backend_name => {";
             say "              dsn          => 'dbi:SQLite:dbname=data/app.db',";
             say "              schema_class => '$class_name',";
             say "          },";
-            say "      },";
+            say "      ],";
             say "  },";
         }
         elsif (!$bdef->{schema_class}) {

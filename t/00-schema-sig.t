@@ -34,13 +34,13 @@ sub build_app {
     $app->plugin('Fondation' => {
         dependencies => [
             { 'Fondation::Model::DBIx::Async' => {
-                backends => {
+                backends => [
                     main => {
                         dsn          => "dbi:SQLite:dbname=$dbfile",
                         schema_class => 'TestSchema',
                         workers      => 1,
                     },
-                },
+                ],
                 models => {
                     foo => { source => 'foos', backend => 'main' },
                 },
@@ -148,13 +148,13 @@ RESULT
     $app->plugin('Fondation' => {
         dependencies => [
             { 'Fondation::Model::DBIx::Async' => {
-                backends => {
+                backends => [
                     main => {
                         dsn          => "dbi:SQLite:dbname=$dbfile",
                         schema_class => 'DriftTestSchema',
                         workers      => 1,
                     },
-                },
+                ],
                 models => {
                     foo => { source => 'foos', backend => 'main' },
                 },
@@ -195,13 +195,13 @@ RESULT2
     $app2->plugin('Fondation' => {
         dependencies => [
             { 'Fondation::Model::DBIx::Async' => {
-                backends => {
+                backends => [
                     main => {
                         dsn          => "dbi:SQLite:dbname=$dbfile",
                         schema_class => 'DriftTestSchema',
                         workers      => 1,
                     },
-                },
+                ],
                 models => {
                     foo => { source => 'foos', backend => 'main' },
                 },
