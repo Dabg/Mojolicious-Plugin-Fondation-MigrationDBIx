@@ -13,7 +13,17 @@ sub fondation_meta {
     return {
         dependencies => ['Fondation::Model::DBIx::Async'],
         defaults     => {
-            title => 'DBIx Database Migration',
+            title             => 'DBIx Database Migration',
+            fondation_init    => [
+                ['db', 'prepare', '-y'],
+                ['db', 'install'],
+                ['db', 'populate'],
+            ],
+            fondation_upgrade => [
+                ['db', 'prepare', '-y', '-a'],
+                ['db', 'upgrade'],
+            ],
+            fondation_clean   => ['data/app.db'],
         },
     };
 }
