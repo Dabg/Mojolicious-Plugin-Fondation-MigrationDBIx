@@ -16,7 +16,7 @@ version 0.01
                     backends => [ main => { ... } ],
                 }},
                 { 'Fondation::MigrationDBIx' => {
-                    backend => 'main',    # optional — uses DBIx::Async default
+                    backend => 'main',    # optional -- uses DBIx::Async default
                 }},
             ],
         },
@@ -53,9 +53,9 @@ For incremental changes, edit your schema, re-run `db prepare`, then
 
 - **DBIx::Class::DeploymentHandler** with `ignore_ddl = 1`.
 Upgrade and downgrade SQL are generated on-the-fly from `_source/` YAML files
-— no `db dump` step needed.
-- **Backend resolution**: explicit `backend` config → `default_backend` from
-DBIx::Async → first backend configured. Dies if no backend can be resolved.
+-- no `db dump` step needed.
+- **Backend resolution**: explicit `backend` config -> `default_backend` from
+DBIx::Async -> first backend configured. Dies if no backend can be resolved.
 - **Driver detection**: the database driver (SQLite, Pg, mysql) is parsed from
 the DSN, never hardcoded.
 - **Plugin fixtures**: `db prepare` scans all loaded plugins for
@@ -103,14 +103,14 @@ from ["schema\_sig" in Fondation::Model::DBIx::Async](https://metacpan.org/pod/F
 Used automatically at application startup via `fondation_finalyze`:
 if a plugin Result class has changed (e.g. after a `cpanm` upgrade),
 a warning is logged suggesting `db prepare -a && db upgrade`.
-The application continues running — the schema is not broken, just
+The application continues running -- the schema is not broken, just
 out of sync with the migration files.
 
 # CONFIGURATION
 
     'Fondation::MigrationDBIx' => {
-        backend        => 'main',    # optional — defaults to DBIx::Async default
-        migrations_dir => '/path',   # optional — defaults to <app>/share/migrations
+        backend        => 'main',    # optional -- defaults to DBIx::Async default
+        migrations_dir => '/path',   # optional -- defaults to <app>/share/migrations
     }
 
 ### backend
@@ -136,7 +136,7 @@ creating the file, add `schema_class` to your backend config and run
 The generated class uses `load_namespaces` to auto-discover any `Result`
 classes under the application's `Schema::Result::*` namespace. Result
 classes from Fondation plugins are registered separately by the `DBIx`
-action before workers fork — both mechanisms coexist transparently.
+action before workers fork -- both mechanisms coexist transparently.
 
 When both the application and a plugin define a `Result` class for the
 same table, the application's class wins: `load_namespaces` runs during
@@ -176,9 +176,9 @@ by set name. Defaults to loading all sets under version `1`.
 
 # SEE ALSO
 
-- [Mojolicious::Plugin::Fondation::Model::DBIx::Async](https://metacpan.org/pod/Mojolicious%3A%3APlugin%3A%3AFondation%3A%3AModel%3A%3ADBIx%3A%3AAsync) — database backend plugin
-- [DBIx::Class::DeploymentHandler](https://metacpan.org/pod/DBIx%3A%3AClass%3A%3ADeploymentHandler) — migration engine
-- [DBIx::Class::Migration](https://metacpan.org/pod/DBIx%3A%3AClass%3A%3AMigration) — fixture loading
+- [Mojolicious::Plugin::Fondation::Model::DBIx::Async](https://metacpan.org/pod/Mojolicious%3A%3APlugin%3A%3AFondation%3A%3AModel%3A%3ADBIx%3A%3AAsync) -- database backend plugin
+- [DBIx::Class::DeploymentHandler](https://metacpan.org/pod/DBIx%3A%3AClass%3A%3ADeploymentHandler) -- migration engine
+- [DBIx::Class::Migration](https://metacpan.org/pod/DBIx%3A%3AClass%3A%3AMigration) -- fixture loading
 
 # AUTHOR
 

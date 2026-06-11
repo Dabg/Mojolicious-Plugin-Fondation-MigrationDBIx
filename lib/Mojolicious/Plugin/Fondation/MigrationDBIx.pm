@@ -46,7 +46,7 @@ sub register ($self, $app, $config) {
     push @{$app->commands->namespaces},
         'Mojolicious::Plugin::Fondation::MigrationDBIx::Command';
 
-    # Helper: schema_drift() — detect schema changes since last prepare
+    # Helper: schema_drift() -- detect schema changes since last prepare
     $app->helper(schema_drift => sub ($c) {
         my $cfg = $app->defaults->{'migration_dbix.config'};
 
@@ -59,7 +59,7 @@ sub register ($self, $app, $config) {
         my $live_sig = $c->schema_sig($native);
         my $stored   = $self->_load_sig($cfg->{sig_file});
 
-        # Disconnect the native schema — we only needed it for inspection
+        # Disconnect the native schema -- we only needed it for inspection
         $native->storage->disconnect if $native->storage;
 
         return { has_drift => 0, version => $stored->{version} // '?' }
@@ -108,21 +108,21 @@ sub _load_sig ($self, $sig_file) {
 sub _sig_diff ($self, $stored_sources, $live_sources) {
     my $changes = {};
 
-    # Sources in live but not stored → new tables
+    # Sources in live but not stored -> new tables
     for my $name (keys %$live_sources) {
         unless (exists $stored_sources->{$name}) {
             $changes->{$name} = 'new';
         }
     }
 
-    # Sources in stored but not live → removed tables
+    # Sources in stored but not live -> removed tables
     for my $name (keys %$stored_sources) {
         unless (exists $live_sources->{$name}) {
             $changes->{$name} = 'removed';
         }
     }
 
-    # Sources in both → check column-level changes
+    # Sources in both -> check column-level changes
     for my $name (keys %$live_sources) {
         next if $changes->{$name};
         next unless $stored_sources->{$name};
@@ -241,7 +241,7 @@ management for DBIx::Class backends
                   backends => [ main => { ... } ],
               }},
               { 'Fondation::MigrationDBIx' => {
-                  backend => 'main',    # optional — uses DBIx::Async default
+                  backend => 'main',    # optional -- uses DBIx::Async default
               }},
           ],
       },
@@ -282,12 +282,12 @@ C<db upgrade> / C<db downgrade>.
 
 B<DBIx::Class::DeploymentHandler> with C<ignore_ddl = 1>.
 Upgrade and downgrade SQL are generated on-the-fly from C<_source/> YAML files
-— no C<db dump> step needed.
+-- no C<db dump> step needed.
 
 =item *
 
-B<Backend resolution>: explicit C<backend> config → C<default_backend> from
-DBIx::Async → first backend configured. Dies if no backend can be resolved.
+B<Backend resolution>: explicit C<backend> config -> C<default_backend> from
+DBIx::Async -> first backend configured. Dies if no backend can be resolved.
 
 =item *
 
@@ -337,14 +337,14 @@ from L<Fondation::Model::DBIx::Async/schema_sig>.
 Used automatically at application startup via C<fondation_finalyze>:
 if a plugin Result class has changed (e.g. after a C<cpanm> upgrade),
 a warning is logged suggesting C<db prepare -a && db upgrade>.
-The application continues running — the schema is not broken, just
+The application continues running -- the schema is not broken, just
 out of sync with the migration files.
 
 =head1 CONFIGURATION
 
   'Fondation::MigrationDBIx' => {
-      backend        => 'main',    # optional — defaults to DBIx::Async default
-      migrations_dir => '/path',   # optional — defaults to <app>/share/migrations
+      backend        => 'main',    # optional -- defaults to DBIx::Async default
+      migrations_dir => '/path',   # optional -- defaults to <app>/share/migrations
   }
 
 =head3 backend
@@ -370,7 +370,7 @@ C<db prepare> to generate migration files.
 The generated class uses C<load_namespaces> to auto-discover any C<Result>
 classes under the application's C<Schema::Result::*> namespace. Result
 classes from Fondation plugins are registered separately by the C<DBIx>
-action before workers fork — both mechanisms coexist transparently.
+action before workers fork -- both mechanisms coexist transparently.
 
 When both the application and a plugin define a C<Result> class for the
 same table, the application's class wins: C<load_namespaces> runs during
@@ -414,15 +414,15 @@ by set name. Defaults to loading all sets under version C<1>.
 
 =item *
 
-L<Mojolicious::Plugin::Fondation::Model::DBIx::Async> — database backend plugin
+L<Mojolicious::Plugin::Fondation::Model::DBIx::Async> -- database backend plugin
 
 =item *
 
-L<DBIx::Class::DeploymentHandler> — migration engine
+L<DBIx::Class::DeploymentHandler> -- migration engine
 
 =item *
 
-L<DBIx::Class::Migration> — fixture loading
+L<DBIx::Class::Migration> -- fixture loading
 
 =back
 

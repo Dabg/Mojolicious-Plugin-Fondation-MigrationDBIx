@@ -58,7 +58,7 @@ sub build_app {
 }
 
 # ==========================================================================
-# 1. First prepare — saves sig, no drift
+# 1. First prepare -- saves sig, no drift
 # ==========================================================================
 {
     my $tmpdir = tempdir(CLEANUP => 1);
@@ -169,7 +169,7 @@ RESULT
     # First prepare
     capture_run($app, 'db', 'prepare', '-y');
 
-    # Modify the Result — add a column
+    # Modify the Result -- add a column
     $lib_dir->child('DriftTestSchema', 'Result', 'Foo.pm')->spurt(<<"RESULT2");
 package DriftTestSchema::Result::Foo;
 use base 'DBIx::Class::Core';
@@ -240,7 +240,7 @@ RESULT2
 }
 
 # ==========================================================================
-# 4. schema_drift without any prepare — no drift
+# 4. schema_drift without any prepare -- no drift
 # ==========================================================================
 {
     my $tmpdir = tempdir(CLEANUP => 1);

@@ -56,7 +56,7 @@ sub _build_dh ($self, $app, $config) {
 
     my $mig_dir = path($config->{migrations_dir});
 
-    # Derive database type from DSN (e.g. dbi:SQLite:... → SQLite, dbi:Pg:... → Pg)
+    # Derive database type from DSN (e.g. dbi:SQLite:... -> SQLite, dbi:Pg:... -> Pg)
     my $c    = $app->build_controller;
     my $bdef = $c->backend_config($config->{backend});
     my ($driver) = $bdef->{dsn} =~ /^dbi:([^:]+):/i
@@ -73,7 +73,7 @@ sub _build_dh ($self, $app, $config) {
 }
 
 # ---------------------------------------------------------------------------
-# db bootstrap-schema — create a minimal DBIx::Class::Schema class file
+# db bootstrap-schema -- create a minimal DBIx::Class::Schema class file
 # ---------------------------------------------------------------------------
 
 sub _bootstrap_schema ($self, $app, $config, @args) {
@@ -205,7 +205,7 @@ SCHEMA
 }
 
 # ---------------------------------------------------------------------------
-# db prepare — generate SQL from schema + copy fixtures from plugins
+# db prepare -- generate SQL from schema + copy fixtures from plugins
 # ---------------------------------------------------------------------------
 
 sub _prepare ($self, $app, $config, @args) {
@@ -255,7 +255,7 @@ sub _prepare ($self, $app, $config, @args) {
 
     # Auto-bump schema version if requested
     if ($auto_bump && $drift && $drift->{has_drift}) {
-        say "Schema drifted — auto-bumping version...";
+        say "Schema drifted -- auto-bumping version...";
         $self->_bump_schema_version($app, $config);
     }
 
@@ -284,7 +284,7 @@ sub _prepare ($self, $app, $config, @args) {
     # Generate SQL from schema classes via DeploymentHandler
     my $dh = $self->_build_dh($app, $config);
     if ($dh) {
-        # Remove existing generated dirs so DeploymentHandler regenerates cleanly —
+        # Remove existing generated dirs so DeploymentHandler regenerates cleanly --
         # skip this when auto-bumping (we're adding a version, not rebuilding)
         unless ($auto_bump) {
             $mig_dir->child('_source')->remove_tree if $force && -d $mig_dir->child('_source');
@@ -345,7 +345,7 @@ sub _copy_tree_from_plugins ($self, $app, $subdir, $target_dir, $force) {
 }
 
 # ---------------------------------------------------------------------------
-# db install — run DeploymentHandler install
+# db install -- run DeploymentHandler install
 # ---------------------------------------------------------------------------
 
 sub _install ($self, $app, $config, @args) {
@@ -376,7 +376,7 @@ sub _install ($self, $app, $config, @args) {
 }
 
 # ---------------------------------------------------------------------------
-# db upgrade — run pending upgrades
+# db upgrade -- run pending upgrades
 # ---------------------------------------------------------------------------
 
 sub _upgrade ($self, $app, $config, @args) {
@@ -395,7 +395,7 @@ sub _upgrade ($self, $app, $config, @args) {
 }
 
 # ---------------------------------------------------------------------------
-# db downgrade — rollback one version
+# db downgrade -- rollback one version
 # ---------------------------------------------------------------------------
 
 sub _downgrade ($self, $app, $config, @args) {
@@ -430,7 +430,7 @@ sub _downgrade ($self, $app, $config, @args) {
 }
 
 # ---------------------------------------------------------------------------
-# db status — show current vs latest migration version
+# db status -- show current vs latest migration version
 # ---------------------------------------------------------------------------
 
 sub _status ($self, $app, $config, @args) {
@@ -449,7 +449,7 @@ sub _status ($self, $app, $config, @args) {
 }
 
 # ---------------------------------------------------------------------------
-# db populate — load DBIx fixtures
+# db populate -- load DBIx fixtures
 # ---------------------------------------------------------------------------
 
 sub _populate ($self, $app, $config, @args) {
@@ -515,7 +515,7 @@ sub _populate ($self, $app, $config, @args) {
 # ---------------------------------------------------------------------------
 
 sub _build_native_schema ($self, $app, $config) {
-    # Resolve backend: explicit config → DBIx::Async default → first backend → undef
+    # Resolve backend: explicit config -> DBIx::Async default -> first backend -> undef
     my $c = $app->build_controller;
     my $backend_name;
     if ($c->has_helper('default_backend_name')) {
@@ -682,7 +682,7 @@ Command-line interface for managing database migrations and fixtures
 for DBIx::Class backends managed by L<Fondation::Model::DBIx::Async>.
 
 Migrations use L<DBIx::Class::DeploymentHandler> directly with C<ignore_ddl = 1>.
-Upgrade and downgrade SQL are generated on-the-fly from C<_source/> YAML files —
+Upgrade and downgrade SQL are generated on-the-fly from C<_source/> YAML files --
 no C<db dump> step is needed.
 
 =head1 COMMANDS
@@ -698,7 +698,7 @@ and run C<db prepare> to generate migration files.
 The generated class uses C<load_namespaces> to auto-discover any C<Result>
 classes under the application's C<Schema::Result::*> namespace. Result
 classes from Fondation plugins are registered separately by the C<DBIx>
-action before workers fork — both mechanisms coexist transparently.
+action before workers fork -- both mechanisms coexist transparently.
 
 If C<schema_class> is already configured in your backend, C<bootstrap-schema>
 uses that class name automatically (no C<--class> needed).
@@ -717,8 +717,8 @@ the already-configured C<schema_class> if the backend defines one.
 
 Backend name to reference in the post-creation instructions. When omitted,
 resolves via C<default_backend_name> (same cascade as other C<db> commands:
-explicit C<Fondation::MigrationDBIx> C<backend> config → DBIx::Async
-C<default_backend> → first backend).
+explicit C<Fondation::MigrationDBIx> C<backend> config -> DBIx::Async
+C<default_backend> -> first backend).
 
 =item C<--force>
 
@@ -744,8 +744,8 @@ directories from all loaded plugins. Use C<-y> to skip the overwrite prompt.
 
 Before generating, compares the live schema signature against the
 C<.schema-sig.json> file saved after the last prepare. If the schema has
-drifted — for example because a plugin Result class changed after a
-C<cpanm> upgrade — the changed sources are reported and the command exits.
+drifted -- for example because a plugin Result class changed after a
+C<cpanm> upgrade -- the changed sources are reported and the command exits.
 
 Use C<-a> to auto-bump the schema C<$VERSION> and generate the migration.
 The version is incremented in the class file and in memory; previous

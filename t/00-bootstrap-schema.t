@@ -193,7 +193,7 @@ sub build_app {
     # add tempdir lib/ to @INC so 'require MySchema' can find the bootstrapped file
     unshift @INC, "$tmpdir/lib";
 
-    # Now prepare should work — the schema class exists
+    # Now prepare should work -- the schema class exists
     my $out = capture_run($app, 'db', 'prepare', '-y');
     like($out, qr/Done/, 'db prepare succeeds after bootstrap');
 }
