@@ -601,7 +601,7 @@ sub _save_sig ($self, $app, $config, $dh) {
         or return;
 
     path($sig_file)->dirname->make_path;
-    path($sig_file)->spew(encode_json($sig));
+    path($sig_file)->spurt(encode_json($sig));
 }
 
 # ---------------------------------------------------------------------------
