@@ -222,11 +222,6 @@ __END__
 
 =encoding UTF-8
 
-=head1 NAME
-
-Mojolicious::Plugin::Fondation::MigrationDBIx - Migration and fixture
-management for DBIx::Class backends
-
 =head1 VERSION
 
 0.01
