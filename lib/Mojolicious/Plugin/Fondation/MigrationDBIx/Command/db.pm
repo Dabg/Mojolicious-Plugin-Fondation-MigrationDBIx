@@ -7,8 +7,6 @@ use Mojo::Base 'Mojolicious::Command', -signatures;
 use Mojo::File 'path';
 use JSON::MaybeXS;
 
-our $VERSION = '0.02';
-
 has description => 'Manage database migrations and fixtures for DBIx backends';
 has usage       => sub ($self) {
     <<"USAGE";

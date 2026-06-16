@@ -7,8 +7,6 @@ use Mojo::Base 'Mojolicious::Plugin', -signatures;
 use Mojo::File 'path';
 use JSON::MaybeXS;
 
-our $VERSION = '0.01';
-
 sub fondation_meta {
     return {
         dependencies => ['Fondation::Model::DBIx::Async'],

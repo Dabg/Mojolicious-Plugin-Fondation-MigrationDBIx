@@ -77,11 +77,6 @@ directory. The directory structure is:
             └── my_table/
                 └── 1.fix      # fixture data
 
-# NAME
-
-Mojolicious::Plugin::Fondation::MigrationDBIx - Migration and fixture
-management for DBIx::Class backends
-
 # VERSION
 
 0.01
