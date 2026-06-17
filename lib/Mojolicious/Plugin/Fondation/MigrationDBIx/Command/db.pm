@@ -350,10 +350,10 @@ sub _copy_tree_from_plugins ($self, $app, $subdir, $target_dir, $force) {
 
             my $rel_path = $src->to_rel($src_root);
 
-            # Strip the plugin's fixture version prefix (e.g. "1/")
+            # Strip the plugin's fixture version prefix (e.g. "1/" or "1\")
             # so that fixtures land in the target version directory
             # determined by the current schema version.
-            $rel_path =~ s{^[^/]+/}{};
+            $rel_path =~ s{^[^/\\]+[/\\]}{};
             my $target = $target_dir->child($rel_path);
 
             next if -e $target && !$force;
