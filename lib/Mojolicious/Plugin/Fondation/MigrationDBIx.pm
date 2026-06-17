@@ -20,8 +20,13 @@ sub fondation_meta {
             fondation_upgrade => [
                 ['db', 'prepare', '-y', '-a'],
                 ['db', 'upgrade'],
+                ['db', 'populate'],
             ],
-            fondation_clean   => ['data/app.db'],
+            fondation_clean   => [
+                'data/app.db',
+                'share/fixtures',
+                'share/migrations',
+            ],
         },
     };
 }
