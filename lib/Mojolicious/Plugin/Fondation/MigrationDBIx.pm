@@ -23,7 +23,6 @@ sub fondation_meta {
                 ['db', 'populate'],
             ],
             fondation_clean   => [
-                'data/app.db',
                 'share/fixtures',
                 'share/migrations',
             ],
