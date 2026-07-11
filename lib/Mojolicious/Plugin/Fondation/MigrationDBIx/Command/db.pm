@@ -506,7 +506,8 @@ sub _populate ($self, $app, $config, @args) {
     my $conf_dir = $app->home->child('share', 'fixtures', $set_version, 'conf');
 
     unless (-d $conf_dir) {
-        die "Fixture config directory not found: $conf_dir\n";
+        say "Fixture config directory not found: $conf_dir";
+        return;
     }
 
     # Discover available set names from conf/*.json
