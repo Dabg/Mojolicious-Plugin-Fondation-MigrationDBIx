@@ -1,7 +1,12 @@
 Revision history for Mojolicious-Plugin-Fondation-MigrationDBIx
 
 {{$NEXT}}
+        - no die if there is no fixture
+        - replace table name with result_class name
+        - data/app.db is cleaned with Fondation::Starter
         - Remove modules duplicated by @Basic
+
+0.02      2026-06-17 14:01:54+02:00 Europe/Paris
         - Fix fixture versioning: use DB version, add fixtures_loaded tracking, protect bootstrap-schema
         - replace table name with result_class name
 
