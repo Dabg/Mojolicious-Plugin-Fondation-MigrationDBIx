@@ -209,7 +209,6 @@ SCHEMA
         }
         else {
             say "Schema class '$class_name' is ready.";
-            say "Run: myapp.pl db prepare";
         }
     }
     else {
