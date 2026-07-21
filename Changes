@@ -1,6 +1,8 @@
 Revision history for Mojolicious-Plugin-Fondation-MigrationDBIx
 
 {{$NEXT}}
+        - Resolve belongs_to dependencies between fixtures sets
+        - test with Mysql and Postgresql
 
 0.03      2026-07-13 22:34:26+02:00 Europe/Paris
         - no die if there is no fixture
